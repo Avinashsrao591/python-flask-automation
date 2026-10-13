@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Automation Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f4f6f9;
+            color: #1f2937;
+        }
+
+        h1 { margin-bottom: 8px; }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #00000012;
+        }
+
+        button, select {
+            padding: 10px 14px;
+            margin: 6px 4px 6px 0;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:disabled { opacity: 0.6; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            overflow-wrap: anywhere;
+        }
+
+        .passed { color: #15803d; font-weight: bold; }
+        .failed { color: #b91c1c; font-weight: bold; }
+        .running { color: #b45309; font-weight: bold; }
+        .queued { color: #6b7280; font-weight: bold; }
+
+        #message { white-space: pre-wrap; }
+
+        
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: white;
+    padding: 18px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #00000012;
+}
+
+.stat-card h3 {
+    font-size: 14px;
+    color: #6b7280;
+    margin-top: 0;
+}
+
+.stat-card p {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+@media (max-width: 650px) {
+    .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+    </style>
+    
+</head>
+<body>
+    <h1>Python Flask Automation Dashboard</h1>
+    <p>Launch and monitor your automation jobs.</p>
+
+    <section class="card">
+        <h2>Launch a job</h2>
+
+        <label for="jobType">Test suite:</label>
+        <select id="jobType">
+            <option value="smoke">Smoke</option>
+            <option value="regression">Regression</option>
+            <option value="api">API</option>
+            <option value="ui">Selenium UI</option>
+        </select>
+
+        <button id="runButton" onclick="runJob()">
+            Run automation
+        </button>
+
+        <p id="message" role="status"></p>
+    </section>
+
+<section class="stats">
+    <div class="stat-card">
+        <h3>Total Jobs</h3>
+        <p id="totalJobs">0</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>Passed</h3>
+        <p id="passedJobs">0</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>Failed</h3>
+        <p id="failedJobs">0</p>
+    </div>
+
+    <div class="stat-card">
+        <h3>In Progress</h3>
+        <p id="runningJobs">0</p>
+    </div>
+</section>
+
+    <section class="card">
+        <h2>Execution history</h2>
+
+        <button onclick="loadJobs()">Refresh jobs</button>
+
+        <table>
+            
+<thead>
+    <tr>
+        <th>Job ID</th>
+        <th>Suite</th>
+        <th>Status</th>
+        <th>Duration (s)</th>
+        <th>Tests</th>
+        <th>Report</th>
+    </tr>
+</thead>
+
+            <tbody id="jobs">
+                <tr><td colspan="4">Loading jobs...</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <script>
+        async function loadJobs() {
+           
+async function loadJobs() {
+    const tbody = document.getElementById("jobs");
+
+    try {
+        const response = await fetch("/api/jobs");
+
+        if (!response.ok) {
+            throw new Error("Unable to load jobs");
+        }
+
+        const data = await response.json();
+        const jobs = data.jobs;
+
+        document.getElementById("totalJobs").textContent =
+            jobs.length;
+
+        document.getElementById("passedJobs").textContent =
+            jobs.filter(job => job.status === "passed").length;
+
+        document.getElementById("failedJobs").textContent =
+            jobs.filter(job => job.status === "failed").length;
+
+        document.getElementById("runningJobs").textContent =
+            jobs.filter(job =>
+                ["queued", "running"].includes(job.status)
+            ).length;
+
+        tbody.replaceChildren();
+
+        for (const job of [...jobs].reverse()) {
+            const row = document.createElement("tr");
+
+            const idCell = document.createElement("td");
+            idCell.textContent = job.job_id.slice(0, 8) + "...";
+            idCell.title = job.job_id;
+
+            const typeCell = document.createElement("td");
+            typeCell.textContent = job.job_type;
+
+            const statusCell = document.createElement("td");
+            statusCell.textContent = job.status;
+            statusCell.className = job.status;
+
+const durationCell = document.createElement("td");
+durationCell.textContent =
+    job.duration_seconds == null
+        ? "-"
+        : job.duration_seconds.toFixed(2);
+
+const testsCell = document.createElement("td");
+
+if (job.result) {
+    testsCell.textContent =
+        `${job.result.tests_passed ?? 0} passed, ` +
+        `${job.result.tests_failed ?? 0} failed, ` +
+        `${job.result.tests_skipped ?? 0} skipped`;
+
+    if (job.result.failure_summary?.length) {
+        testsCell.title = job.result.failure_summary.join("\n");
+    }
+} else {
+    testsCell.textContent = "-";
+}
+
+            const reportCell = document.createElement("td");
+
+            if (job.report) {
+                const link = document.createElement("a");
+                link.href =
+                    "/reports/" + encodeURIComponent(job.job_id);
+                link.textContent = "View report";
+                reportCell.appendChild(link);
+            } else {
+                reportCell.textContent = "Not available";
+            }
+
+            row.append(
+    idCell,
+    typeCell,
+    statusCell,
+    durationCell,
+    testsCell,
+    reportCell
+);
+            tbody.appendChild(row);
+        }
+
+        if (jobs.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 6;
+            cell.textContent = "No jobs submitted yet.";
+            row.appendChild(cell);
+            tbody.appendChild(row);
+        }
+    } catch (error) {
+        tbody.replaceChildren();
+
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 4;
+        cell.textContent = error.message;
+
+        row.appendChild(cell);
+        tbody.appendChild(row);
+    }
+}
+
+}
+
+        async function runJob() {
+            const button = document.getElementById("runButton");
+            const message = document.getElementById("message");
+            const jobType = document.getElementById("jobType").value;
+
+            button.disabled = true;
+            message.textContent = "Submitting job...";
+
+            try {
+                const response = await fetch("/api/jobs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ job_type: jobType })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Job submission failed");
+                }
+
+                message.textContent = "Job submitted: " + data.job_id;
+                await loadJobs();
+            } catch (error) {
+                message.textContent = "Error: " + error.message;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        loadJobs();
+        setInterval(loadJobs, 3000);
+    </script>
+</body>
+</html>
